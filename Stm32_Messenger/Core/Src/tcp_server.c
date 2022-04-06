@@ -34,6 +34,8 @@
 
 #define IP_ADDRESS_LENGTH		14U
 
+#define CLIENT_EXIST(client)	(client.id > 0)
+
 
 /* Local object definition */
 static socket_t First, Second;
@@ -48,6 +50,7 @@ static char * get_ip_address(const struct in_addr *address);
 
 void tcp_server_init(void)
 {
+	/* Create two threads to handle the connection */
 	sys_thread_new("FirstClient", FirstClient, NULL, THREAD_STACK_SIZE, osPriorityHigh);
 	sys_thread_new("SecondClient", SecondClient, NULL, THREAD_STACK_SIZE, osPriorityHigh);
 }
@@ -95,14 +98,28 @@ static void FirstClient(void *args)
 
 	while(1)
 	{
-		data_length = lwip_read(First.id, msg_buf, MSG_BUFFER_SIZE);
+		if(CLIENT_EXIST(First))
+		{
+			data_length = lwip_read(First.id, msg_buf, MSG_BUFFER_SIZE);
 
-	    if (data_length && data_length != INT32_MAX)
-	    {
-	    	printf("From %s received: %s\n\r", get_ip_address(&First.host_adr.sin_addr), msg_buf);
-		    lwip_write(Second.id, (uint8_t*)msg_buf, sizeof(msg_buf));
-		    memset(msg_buf, 0, MSG_BUFFER_SIZE);
-	    }
+		    if(data_length > 0)
+		    {
+		    	printf("From %s received: %s\n\r", get_ip_address(&First.host_adr.sin_addr), msg_buf);
+			    lwip_write(Second.id, (uint8_t*)msg_buf, sizeof(msg_buf));
+			    memset(msg_buf, 0, MSG_BUFFER_SIZE);
+		    }
+
+			if(data_length < 0)
+			{
+				printf("First client disconnected\n\r");
+				osThreadTerminate(osThreadGetId());
+			}
+		}
+		else
+		{
+			printf("Error during creating connection\n\r");
+			osThreadTerminate(osThreadGetId());
+		}
 	}
 }
 
@@ -116,14 +133,28 @@ static void SecondClient(void *args)
 
 	while(1)
 	{
-		data_length = lwip_read(Second.id, msg_buf, MSG_BUFFER_SIZE);
+		if(CLIENT_EXIST(Second))
+		{
+			data_length = lwip_read(Second.id, msg_buf, MSG_BUFFER_SIZE);
 
-		if (data_length && data_length != INT32_MAX)
-	    {
-	    	printf("From %s received: %s\n\r", get_ip_address(&Second.host_adr.sin_addr), msg_buf);
-		    lwip_write(First.id, (uint8_t*)msg_buf, sizeof(msg_buf));
-		    memset(msg_buf, 0, MSG_BUFFER_SIZE);
-	    }
+			if(data_length >= 0)
+		    {
+		    	printf("From %s received: %s\n\r", get_ip_address(&Second.host_adr.sin_addr), msg_buf);
+			    lwip_write(First.id, (uint8_t*)msg_buf, sizeof(msg_buf));
+			    memset(msg_buf, 0, MSG_BUFFER_SIZE);
+		    }
+
+			if(data_length < 0)
+			{
+				printf("Second client disconnected\n\r");
+				osThreadTerminate(osThreadGetId());
+			}
+		}
+		else
+		{
+			printf("Error during creating connection\n\r");
+			osThreadTerminate(osThreadGetId());
+		}
 	}
 }
 

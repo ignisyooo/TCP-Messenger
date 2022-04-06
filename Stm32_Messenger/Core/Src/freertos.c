@@ -127,7 +127,6 @@ void StartdiagTask(void *argument)
   MX_LWIP_Init();
   /* USER CODE BEGIN StartdiagTask */
 
-  //server_socket_init();
   tcp_server_init();
 
   /* Infinite loop */
